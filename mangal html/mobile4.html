@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Bus Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        #map { height: 400px; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🚌 Realtime Bus Tracker</h1>
+    
+    <label for="busName">Enter Bus Name:</label>
+    <input type="text" id="busName" placeholder="Enter Bus Name (e.g., 121212)" />
+    
+    <button id="sendLocationBtn">📍 Send Location</button>
+    <p id="status">Waiting for location...</p>
+    
+    <div id="map"></div>  
+
+    <script type="module">
+        console.log("✅ Script Loaded");
+
+        // Import Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        // Firebase configuration
+        // const firebaseConfig = {
+        //     apiKey: "AIzaSyALfsRzTHo-DrLE8wIFOMEEFC4jVPsaPvw",
+        //     authDomain: "new-gps-mobile-tracking.firebaseapp.com",
+        //     databaseURL: "https://new-gps-mobile-tracking-default-rtdb.firebaseio.com",
+        //     projectId: "new-gps-mobile-tracking",
+        //     storageBucket: "new-gps-mobile-tracking.appspot.com",
+        //     messagingSenderId: "881121307648",
+        //     appId: "1:881121307648:web:1718a31d96f5c559bffce5",
+        //     measurementId: "G-5S6YWS1EQY"
+        // };
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBmjO0XTKnuNpjgRhQwFNiwyziQygjfWBI",
+  authDomain: "bustrackingg-7d3c0.firebaseapp.com",
+  databaseURL: "https://bustrackingg-7d3c0-default-rtdb.firebaseio.com",
+  projectId: "bustrackingg-7d3c0",
+  storageBucket: "bustrackingg-7d3c0.firebasestorage.app",
+  messagingSenderId: "680744411503",
+  appId: "1:680744411503:web:8d34b848c7d622e1de089a",
+  measurementId: "G-L46LL4JWVF"
+};
+
+
+        // Initialize Firebase
+        console.log("✅ Initializing Firebase...");
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        console.log("✅ Firebase Initialized!");
+
+        // Load Leaflet.js
+        const leafletScript = document.createElement("script");
+        leafletScript.src = "https://unpkg.com/leaflet/dist/leaflet.js";
+        document.head.appendChild(leafletScript);
+
+        let map, marker; // Define map and marker variables
+
+        // Function to initialize the map
+        function initMap(lat, lng) {
+            if (!map) {
+                map = L.map('map').setView([lat, lng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                marker = L.marker([lat, lng]).addTo(map).bindPopup("📍 Tracking Bus").openPopup();
+            } else {
+                map.setView([lat, lng], 13);
+                marker.setLatLng([lat, lng]);
+            }
+        } 
+
+        // Function to send bus location to Firebase
+        function sendLocation() {
+            const busName = document.getElementById("busName").value.trim();
+            if (busName === "") {
+                alert("⚠️ Please enter a bus name before sending location!");
+                return;
+            }
+
+            console.log("📍 Getting Location for Bus:", busName);
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        const timestamp = new Date().toISOString();
+
+                        console.log(`📍 Bus ${busName} Location: Lat=${latitude}, Lng=${longitude}`);
+
+                        // Store bus name in Firebase
+                        set(ref(database, `buses/${busName}/info`), {
+                            name: busName,
+                            updatedAt: timestamp
+                        });
+                        
+                        // Send location to Firebase
+                        set(ref(database, `buses/${busName}/location`), {
+                            latitude: latitude,
+                            longitude: longitude,
+                            timestamp: timestamp
+                        }).then(() => {
+                            document.getElementById("status").innerText = `✅ Location Sent for Bus: ${busName}\nLat: ${latitude}, Lng: ${longitude}`;
+                            console.log("✅ Location sent to Firebase!");
+                        }).catch((error) => {
+                            document.getElementById("status").innerText = "❌ Failed to send location!";
+                            console.error("Firebase Error:", error);
+                        });
+
+                        // Start listening for real-time updates for the entered bus
+                        listenForUpdates(busName);
+                    },
+                    (error) => {
+                        document.getElementById("status").innerText = "❌ Location Access Denied!";
+                        console.error("Geolocation Error:", error);
+                    }
+                );
+            } else {
+                document.getElementById("status").innerText = "❌ Geolocation not supported!";
+                console.error("❌ Geolocation not supported in this browser!");
+            }
+        }
+
+        // Function to listen for real-time location updates for a specific bus
+        function listenForUpdates(busName) {
+            onValue(ref(database, `buses/${busName}/location`), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    console.log("📡 Realtime Update for Bus:", busName, data);
+                    document.getElementById("status").innerText = `📡 Live Location for Bus ${busName}:\nLat: ${data.latitude}, Lng: ${data.longitude}`;
+
+                    // Update map with new location
+                    initMap(data.latitude, data.longitude);
+                }
+            });
+        }
+
+        // Attach event listener to button
+        document.getElementById("sendLocationBtn").addEventListener("click", sendLocation);
+
+    </script>
+</body>
+</html> -->

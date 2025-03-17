@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Bus Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 500px; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🚌 Realtime Bus Tracker</h1>
+    
+    <label for="busName">Enter Bus Name:</label>
+    <input type="text" id="busName" placeholder="Enter Bus Name (e.g., 121212)" />
+    
+    <button id="sendLocationBtn">📍 Send Location</button>
+    <p id="status">Waiting for location...</p>
+    
+    <div id="map"></div> <!-- Map container -->
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script type="module">
+        console.log("✅ Script Loaded");
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+       // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBmjO0XTKnuNpjgRhQwFNiwyziQygjfWBI",
+  authDomain: "bustrackingg-7d3c0.firebaseapp.com",
+  databaseURL: "https://bustrackingg-7d3c0-default-rtdb.firebaseio.com",
+  projectId: "bustrackingg-7d3c0",
+  storageBucket: "bustrackingg-7d3c0.firebasestorage.app",
+  messagingSenderId: "680744411503",
+  appId: "1:680744411503:web:8d34b848c7d622e1de089a",
+  measurementId: "G-L46LL4JWVF"
+};
+
+        console.log("✅ Initializing Firebase...");
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        console.log("✅ Firebase Initialized!");
+
+        let map = L.map('map').setView([20.5937, 78.9629], 5); // Default to India
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        let marker = L.marker([20.5937, 78.9629]).addTo(map).bindPopup("📍 Bus Location");
+
+        function sendLocation() {
+            const busName = document.getElementById("busName").value.trim();
+            if (busName === "") {
+                alert("⚠️ Please enter a bus name before sending location!");
+                return;
+            }
+
+            console.log("📍 Getting Location for Bus:", busName);
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        const timestamp = new Date().toISOString();
+
+                        console.log(`📍 Bus ${busName} Location: Lat=${latitude}, Lng=${longitude}`);
+
+                        set(ref(database, `buses/${busName}/location`), {
+                            latitude: latitude,
+                            longitude: longitude,
+                            timestamp: timestamp
+                        }).then(() => {
+                            document.getElementById("status").innerText = `✅ Location Sent for Bus: ${busName}\nLat: ${latitude}, Lng: ${longitude}`;
+                            console.log("✅ Location sent to Firebase!");
+                        }).catch((error) => {
+                            document.getElementById("status").innerText = "❌ Failed to send location!";
+                            console.error("Firebase Error:", error);
+                        });
+
+                        listenForUpdates(busName);
+                    },
+                    (error) => {
+                        document.getElementById("status").innerText = "❌ Location Access Denied!";
+                        console.error("Geolocation Error:", error);
+                    }
+                );
+            } else {
+                document.getElementById("status").innerText = "❌ Geolocation not supported!";
+                console.error("❌ Geolocation not supported in this browser!");
+            }
+        }
+
+        function listenForUpdates(busName) {
+            onValue(ref(database, `buses/${busName}/location`), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    console.log("📡 Realtime Update for Bus:", busName, data);
+                    document.getElementById("status").innerText = `📡 Live Location for Bus ${busName}:\nLat: ${data.latitude}, Lng: ${data.longitude}`;
+                    marker.setLatLng([data.latitude, data.longitude]).bindPopup("📍 Bus Location").openPopup();
+                    map.setView([data.latitude, data.longitude], 13);
+                }
+            });
+        }
+
+        document.getElementById("sendLocationBtn").addEventListener("click", sendLocation);
+    </script>
+</body>
+</html>

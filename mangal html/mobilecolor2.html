@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Bus Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        #map { height: 500px; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🚌 Realtime Bus Tracker</h1>
+
+    <label for="busName">Enter Bus Name:</label>
+    <input type="text" id="busName" placeholder="Enter Bus Name (e.g., 121212)" />
+    
+    <button id="trackBusBtn">📡 Track Bus</button>
+    <p id="status">Waiting for location...</p>
+
+    <div id="map"></div> <!-- Map container -->
+
+    <script type="module">
+        console.log("✅ Script Loaded");
+
+        // Import Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyALfsRzTHo-DrLE8wIFOMEEFC4jVPsaPvw",
+            authDomain: "new-gps-mobile-tracking.firebaseapp.com",
+            databaseURL: "https://new-gps-mobile-tracking-default-rtdb.firebaseio.com",
+            projectId: "new-gps-mobile-tracking",
+            storageBucket: "new-gps-mobile-tracking.appspot.com",
+            messagingSenderId: "881121307648",
+            appId: "1:881121307648:web:1718a31d96f5c559bffce5",
+            measurementId: "G-5S6YWS1EQY"
+        };
+
+        // Initialize Firebase
+        console.log("✅ Initializing Firebase...");
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        console.log("✅ Firebase Initialized!");
+
+        // Load Leaflet.js and Routing Machine
+        const leafletScript = document.createElement("script");
+        leafletScript.src = "https://unpkg.com/leaflet/dist/leaflet.js";
+        document.head.appendChild(leafletScript);
+
+        const routingScript = document.createElement("script");
+        routingScript.src = "https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js";
+        document.head.appendChild(routingScript);
+
+        let map, marker, control; // Define map, marker, and route control
+
+        // Function to initialize the map
+        function initMap(lat, lng) {
+            if (!map) {
+                map = L.map('map').setView([lat, lng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                marker = L.marker([lat, lng]).addTo(map).bindPopup("📍 Tracking Bus").openPopup();
+            } else {
+                map.setView([lat, lng], 13);
+                marker.setLatLng([lat, lng]);
+            }
+        }
+
+        // Function to draw the exact road route from Tambaram to Sholinganallur
+        function drawExactRoute() {
+            if (control) {
+                map.removeControl(control); // Remove old route if exists
+            }
+
+            control = L.Routing.control({
+                waypoints: [
+                    L.latLng(12.9229, 80.1275), // Tambaram
+                    L.latLng(12.8996, 80.227)   // Sholinganallur
+                ],
+                routeWhileDragging: true,
+                lineOptions: {
+                    styles: [{ color: 'blue', weight: 5 }]
+                }
+            }).addTo(map);
+
+            console.log("🚏 Exact road route from Tambaram to Sholinganallur added!");
+        }
+
+        // Function to track bus in real-time
+        function trackBus() {
+            const busName = document.getElementById("busName").value.trim();
+            if (busName === "") {
+                alert("⚠️ Please enter a bus name!");
+                return;
+            }
+
+            console.log(`📡 Tracking Bus: ${busName}`);
+
+            // Listen for real-time updates
+            onValue(ref(database, `buses/${busName}/location`), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    console.log("📡 Realtime Update:", data);
+                    document.getElementById("status").innerText = `📡 Live Location for Bus ${busName}:\nLat: ${data.latitude}, Lng: ${data.longitude}`;
+
+                    // Update map with new location
+                    initMap(data.latitude, data.longitude);
+
+                    // If bus name = "121212", draw the exact route
+                    if (busName === "121212") {
+                        drawExactRoute();
+                    }
+                } else {
+                    document.getElementById("status").innerText = "❌ No location data found!";
+                    console.warn("⚠️ No location data available in Firebase!");
+                }
+            });
+        }
+
+        // Attach event listener to button
+        document.getElementById("trackBusBtn").addEventListener("click", trackBus);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin's Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🚌 Realtime Bus Tracker</h1>
+
+    <label for="busName">Enter Bus Name:</label>
+    <input type="text" id="busName" placeholder="Enter Bus Name (e.g., 121212)" />
+
+    <button id="trackBusBtn">📡 Track Bus</button>
+    <p id="status">Waiting for location...</p>
+
+    <div id="map"></div> <!-- Map container -->
+
+    <script type="module">
+        console.log("✅ Script Loaded");
+
+        // Import Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        // //  original Firebase configuration
+        // const firebaseConfig = {
+        //     apiKey: "AIzaSyBmjO0XTKnuNpjgRhQwFNiwyziQygjfWBI",
+        //     authDomain: "bustrackingg-7d3c0.firebaseapp.com",
+        //     databaseURL: "https://bustrackingg-7d3c0-default-rtdb.firebaseio.com",
+        //     projectId: "bustrackingg-7d3c0",
+        //     storageBucket: "bustrackingg-7d3c0.firebasestorage.app",
+        //     messagingSenderId: "680744411503",
+        //     appId: "1:680744411503:web:8d34b848c7d622e1de089a",
+        //     measurementId: "G-L46LL4JWVF"
+        // };
+
+
+        // My Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQA7ngxlGP083vafnO_NGMzjML6y7ptaA",
+            authDomain: "drivertrackingapp-2ab22.firebaseapp.com",
+            databaseURL: "https://drivertrackingapp-2ab22-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "drivertrackingapp-2ab22",
+            storageBucket: "drivertrackingapp-2ab22.firebasestorage.app",
+            messagingSenderId: "411683208377",
+            appId: "1:411683208377:web:0805d62188c5db21fb6f68",
+            measurementId: "G-C96K1WESMP"
+        };
+
+        // Initialize Firebase
+        console.log("✅ Initializing Firebase...");
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        console.log("✅ Firebase Initialized!");
+
+        // Load Leaflet.js
+        const leafletScript = document.createElement("script");
+        leafletScript.src = "https://unpkg.com/leaflet/dist/leaflet.js";
+        document.head.appendChild(leafletScript);
+
+        let map, marker; // Define map and marker variables
+
+        // Function to initialize/update the map
+        function initMap(lat, lng, placeName = "Tracking Bus") {
+            if (!map) {
+                map = L.map('map').setView([lat, lng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                marker = L.marker([lat, lng]).addTo(map).bindPopup(`📍 ${placeName}`).openPopup();
+            } else {
+                map.setView([lat, lng], 13);
+                marker.setLatLng([lat, lng]).bindPopup(`📍 ${placeName}`).openPopup();
+            }
+        }
+
+        // Function to track bus in real-time
+        function trackBus() {
+            const busName = document.getElementById("busName").value.trim();
+            if (busName === "") {
+                alert("⚠️ Please enter a bus name!");
+                return;
+            }
+
+            console.log(`📡 Tracking Bus: ${busName}`);
+
+            // Listen for real-time updates
+            onValue(ref(database, `buses/${busName}/location`), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    console.log("📡 Realtime Update:", data);
+                    const placeName = data.placeName || "Unknown Location";
+
+                    // Update status message with place name
+                    document.getElementById("status").innerText =
+                        `📡 Live Location for Bus ${busName}:\nLat: ${data.latitude}, Lng: ${data.longitude}\n📍 ${placeName}`;
+
+                    // Update map with new location
+                    initMap(data.latitude, data.longitude, placeName);
+                } else {
+                    document.getElementById("status").innerText = "❌ No location data found!";
+                    console.warn("⚠️ No location data available in Firebase!");
+                }
+            });
+        }
+
+        // Attach event listener to button
+        document.getElementById("trackBusBtn").addEventListener("click", trackBus);
+
+    </script>
+</body>
+
+</html>
