@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin's Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #map { height: 400px; width: 100%; margin-top: 10px; }
+        .container { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { background-color: #28a745; color: white; cursor: pointer; }
+        button:hover { background-color: #218838; }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚌 Realtime Bus Tracker</h1>
+        <p id="welcomeUser"></p>
+        <label for="busName">Enter Bus Name:</label>
+        <input type="text" id="busName" placeholder="Enter Bus Name (e.g., 121212)" />
+        <button id="trackBusBtn">📡 Start Tracking</button>
+        <button id="stopTrackingBtn">🛑 Stop Tracking</button>
+        <p id="status">Waiting for location...</p>
+        <div id="map"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBmj...",
+            authDomain: "bustrackingg-7d3c0.firebaseapp.com",
+            databaseURL: "https://bustrackingg-7d3c0-default-rtdb.firebaseio.com",
+            projectId: "bustrackingg-7d3c0",
+            storageBucket: "bustrackingg-7d3c0.appspot.com",
+            messagingSenderId: "680744411503",
+            appId: "1:680744411503:web:8d34b848c7d622e1de089a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        let map, marker, watchId;
+
+        function initMap(lat, lng) {
+            if (!map) {
+                map = L.map('map').setView([lat, lng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+                marker = L.marker([lat, lng]).addTo(map).bindPopup(`📍 Bus Location`).openPopup();
+            } else {
+                marker.setLatLng([lat, lng]).bindPopup(`📍 Bus Location`).openPopup();
+            }
+        }
+
+        function startTracking() {
+            const busName = document.getElementById("busName").value.trim();
+            if (busName === "") {
+                alert("⚠️ Please enter a bus name!");
+                return;
+            }
+
+            watchId = navigator.geolocation.watchPosition((position) => {
+                const { latitude, longitude } = position.coords;
+                document.getElementById("status").innerText = `📡 Lat: ${latitude}, Lng: ${longitude}`;
+                initMap(latitude, longitude);
+
+                set(ref(database, `buses/${busName}/location`), {
+                    latitude, longitude, timestamp: Date.now()
+                });
+            }, (error) => {
+                console.error("❌ Error getting location: ", error);
+            }, { enableHighAccuracy: true, maximumAge: 0 });
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                document.getElementById("status").innerText = "🛑 Tracking stopped.";
+            }
+        }
+
+        document.getElementById("trackBusBtn").addEventListener("click", startTracking);
+        document.getElementById("stopTrackingBtn").addEventListener("click", stopTracking);
+    </script>
+</body>
+
+</html>
